@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.routes.js";
+import analyzeRoutes from "./routes/analyze.routes.js"
 import { connectToDb } from "./lib/db.js";
 import cors from "cors";
 import { corsOptions } from "./config/cors.config.js";
@@ -24,6 +25,8 @@ app.use(express.json());
 app.use(cookieParser());
 app.use("/api/auth", authRoutes);
 app.use("/api/message", messageRoutes);
+app.use("/api/analyze",analyzeRoutes)
+
 
 if(process.env.NODE_ENV === "production"){
   app.use(express.static(path.join(__dirname,"../frontend/dist")))

@@ -2,6 +2,8 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
+import Sentiment from "sentiment";
+import { useThemeStore } from "./useThemeStore";
 
 export const useChatStore = create((set, get) => ({
   messages: [],
@@ -9,6 +11,7 @@ export const useChatStore = create((set, get) => ({
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
+   userSentiments: JSON.parse(localStorage.getItem("userSentiments") || "{}"),
 
   getUsers: async () => {
     set({ isUsersLoading: true });
@@ -34,18 +37,58 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  sendMessages: async (messageData) => {
-    const { selectedUser, messages } = get();
+ sendMessages: async (messageData) => {
+    const { selectedUser, messages, userSentiments } = get();
     try {
       const res = await axiosInstance.post(
         `/message/send/${selectedUser._id}`,
         messageData
       );
-      set({ messages: [...messages, res.data] });
+
+      const updatedMessages = [...messages, res.data];
+      set({ messages: updatedMessages });
+
+      const combinedText = updatedMessages
+        .slice(-10)
+        .map(m => m.text || m.message || "")
+        .join(" ");
+
+      const sentimentRes = await axiosInstance.post("/analyze/sentiment", {
+        text: combinedText
+      });
+
+      const emotion = sentimentRes.data.emotion?.toLowerCase() || "neutral";
+
+      // update sentiment per user
+      const newSentiments = {
+        ...userSentiments,
+        [selectedUser._id]: emotion
+      };
+      localStorage.setItem("userSentiments", JSON.stringify(newSentiments));
+      set({ userSentiments: newSentiments });
+
+      const emotionThemeMap = {
+        joy: 'cupcake',
+        happiness: 'lemonade',
+        excitement: 'emerald',
+        neutral: 'pastel',
+        sadness: 'night',
+        anger: 'dracula',
+        fear: 'luxury'
+      };
+
+      const theme = emotionThemeMap[emotion] || 'pastel';
+
+      useThemeStore.getState().setTheme(theme);
+
     } catch (error) {
-      toast.error(error.response.data.message);
+      console.error(error);
+      toast.error(error.response?.data?.message || "Error sending message");
     }
   },
+
+
+
   setSelectedUser: (selectedUser) => set({ selectedUser }),
 
   subscribeToMessages: ()=>{
